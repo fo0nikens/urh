@@ -6,6 +6,8 @@ from PyQt5.QtWidgets import QApplication
 
 from tests.QtTestCase import QtTestCase
 from tests.utils_testing import get_path_for_data_file
+from urh.controller.MainController import MainController
+from urh.signalprocessing.Participant import Participant
 
 
 class TestSignalTabGUI(QtTestCase):
@@ -245,3 +247,37 @@ class TestSignalTabGUI(QtTestCase):
         self.assertEqual(frame.ui.gvSignal.scene_type, 1)
         if self.SHOW:
             self.assertTrue(frame.ui.gvLegend.isVisible())
+
+    def test_context_menu_text_edit_protocol_view(self):
+        self.add_signal_to_form("esaver.complex")
+        self.form.signal_tab_controller.signal_frames[0].ui.cbProtoView.setCurrentIndex(2)
+        text_edit = self.form.signal_tab_controller.signal_frames[0].ui.txtEdProto
+
+        menu = text_edit.create_context_menu()
+        line_wrap_action = next(action for action in menu.actions() if action.text().startswith("Linewrap"))
+        checked = line_wrap_action.isChecked()
+        line_wrap_action.trigger()
+
+        menu = text_edit.create_context_menu()
+        line_wrap_action = next(action for action in menu.actions() if action.text().startswith("Linewrap"))
+        self.assertNotEqual(checked, line_wrap_action.isChecked())
+
+        self.assertEqual(len([action for action in menu.actions() if action.text() == "Participant"]), 0)
+        self.form.project_manager.participants.append(Participant("Alice", "A"))
+        text_edit.selectAll()
+        menu = text_edit.create_context_menu()
+        self.assertEqual(len([action for action in menu.actions() if action.text() == "Participant"]), 1)
+
+    def test_export_demodulated(self):
+        self.add_signal_to_form("esaver.complex")
+        assert isinstance(self.form, MainController)
+        self.form.signal_tab_controller.signal_frames[0].ui.gvSignal.context_menu_position = QPoint(0,0)
+        cm = self.form.signal_tab_controller.signal_frames[0].ui.gvSignal.create_context_menu()
+        export_action = next((a for a in cm.actions() if "demodulated" in a.text().lower()), None)
+        self.assertIsNone(export_action)
+
+        self.form.signal_tab_controller.signal_frames[0].ui.cbSignalView.setCurrentIndex(1)
+        cm = self.form.signal_tab_controller.signal_frames[0].ui.gvSignal.create_context_menu()
+        export_action = next((a for a in cm.actions() if "demodulated" in a.text().lower()), None)
+        self.assertIsNotNone(export_action)
+

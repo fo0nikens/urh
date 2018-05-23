@@ -100,6 +100,7 @@ class OptionsDialog(QDialog):
         self.read_options()
 
         self.old_default_view = self.ui.comboBoxDefaultView.currentIndex()
+        self.old_num_sending_repeats = self.ui.spinBoxNumSendingRepeats.value()
         self.ui.labelRebuildNativeStatus.setText("")
 
         self.show_available_colormaps()
@@ -239,6 +240,8 @@ class OptionsDialog(QDialog):
             changed_values['show_pause_as_time'] = bool(self.ui.checkBoxPauseTime.isChecked())
         if self.old_default_view != self.ui.comboBoxDefaultView.currentIndex():
             changed_values['default_view'] = self.ui.comboBoxDefaultView.currentIndex()
+        if self.old_num_sending_repeats != self.ui.spinBoxNumSendingRepeats.value():
+            changed_values["num_sending_repeats"] = self.ui.spinBoxNumSendingRepeats.value()
 
         settings = constants.SETTINGS
         settings.setValue('default_view', self.ui.comboBoxDefaultView.currentIndex())
@@ -408,6 +411,7 @@ class OptionsDialog(QDialog):
         extensions = ExtensionHelper.get_device_extensions(use_cython=False, library_dirs=library_dirs)
 
         self.ui.labelRebuildNativeStatus.setText(self.tr("Rebuilding device extensions..."))
+        QApplication.instance().processEvents()
         build_cmd = [sys.executable, os.path.realpath(ExtensionHelper.__file__),
                      "build_ext", "--inplace", "-t", tempfile.gettempdir()]
         if library_dirs:
@@ -443,9 +447,10 @@ class OptionsDialog(QDialog):
     @pyqtSlot()
     def on_btn_health_check_clicked(self):
         info = ExtensionHelper.perform_health_check()
+        info += "\n" + BackendHandler.perform_soundcard_health_check()
 
         if util.get_windows_lib_path():
-            info += "\n\nINFO] Used DLLs from " + util.get_windows_lib_path()
+            info += "\n\n[INFO] Used DLLs from " + util.get_windows_lib_path()
 
         d = util.create_textbox_dialog(info, "Health check for native extensions", self)
         d.show()

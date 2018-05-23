@@ -3,18 +3,23 @@ import tempfile
 import wave
 
 import numpy as np
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QTimer, QDir
 from PyQt5.QtWidgets import QApplication
 
 from tests.QtTestCase import QtTestCase
+from tests.utils_testing import get_path_for_data_file
+from urh import constants
+from urh.controller.MainController import MainController
 from urh.controller.dialogs.CSVImportDialog import CSVImportDialog
 from urh.controller.dialogs.OptionsDialog import OptionsDialog
 
 
 class TestMaincontrollerGUI(QtTestCase):
     def test_open_recent_file(self):
+        constants.SETTINGS.setValue("recentFiles", [])
+
         # Ensure we have at least one recent action
-        self.add_signal_to_form("esaver.complex")
+        self.form.add_files([get_path_for_data_file("esaver.complex")])
         self.assertEqual(len(self.form.signal_tab_controller.signal_frames), 1)
 
         self.form.recentFileActionList[0].trigger()
@@ -66,19 +71,21 @@ class TestMaincontrollerGUI(QtTestCase):
         self.assertEqual(w.ui.tabWidget.currentIndex(), 1)
         w.close()
 
-    def __accept_csv_dialog(self):
-        w = next((w for w in QApplication.topLevelWidgets() if isinstance(w, CSVImportDialog)), None)
-        w.accept()
-
     def test_import_csv(self):
+        def accept_csv_dialog():
+            w = next((w for w in QApplication.topLevelWidgets() if isinstance(w, CSVImportDialog)), None)
+            w.accept()
+            timer.stop()
+
         timer = QTimer(self.form)
         timer.setInterval(10)
-        timer.setSingleShot(True)
-        timer.timeout.connect(self.__accept_csv_dialog)
+        timer.timeout.connect(accept_csv_dialog)
 
         self.assertEqual(self.form.signal_tab_controller.num_frames, 0)
         timer.start()
         self.form.add_files([self.get_path_for_filename("csvtest.csv")])
+
+        self.assertFalse(timer.isActive())
 
         self.assertEqual(self.form.signal_tab_controller.signal_frames[0].signal.num_samples, 100)
         self.assertTrue(os.path.isfile(self.get_path_for_filename("csvtest.complex")))
@@ -122,3 +129,21 @@ class TestMaincontrollerGUI(QtTestCase):
         self.assertEqual(sig_frame.signal.num_samples, 3)
         self.assertNotEqual(sig_frame.signal.data.real.sum(), 0)
         self.assertNotEqual(sig_frame.signal.data.imag.sum(), 0)
+
+    def test_remove_file_from_directory_tree_view(self):
+        assert isinstance(self.form, MainController)
+        file_proxy_model = self.form.file_proxy_model
+        file_model = self.form.filemodel
+        self.form.ui.fileTree.setRootIndex(file_proxy_model.mapFromSource(file_model.index(QDir.tempPath())))
+
+        menu = self.form.ui.fileTree.create_context_menu()
+        remove_action = next((action for action in menu.actions() if action.text() == "Delete"), None)
+        self.assertIsNotNone(remove_action)
+
+        f = os.path.join(QDir.tempPath(), "test")
+        open(f, "w").close()
+        self.assertTrue(os.path.isfile(f))
+        self.form.ui.fileTree.setCurrentIndex(file_proxy_model.mapFromSource(file_model.index(f)))
+
+        remove_action.trigger()
+        self.assertFalse(os.path.isfile(f))

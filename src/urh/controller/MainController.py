@@ -188,6 +188,7 @@ class MainController(QMainWindow):
         self.signal_tab_controller.frame_was_dropped.connect(self.set_frame_numbers)
 
         self.simulator_tab_controller.open_in_analysis_requested.connect(self.on_simulator_open_in_analysis_requested)
+        self.simulator_tab_controller.rx_file_saved.connect(self.adjust_for_current_file)
 
         self.compare_frame_controller.show_interpretation_clicked.connect(
             self.show_protocol_selection_in_interpretation)
@@ -724,7 +725,7 @@ class MainController(QMainWindow):
 
     @pyqtSlot()
     def show_options_dialog_action_triggered(self):
-        self.show_options_dialog_specific_tab(tab_index=0)
+        self.show_options_dialog_specific_tab(tab_index=4)
 
     @pyqtSlot()
     def on_new_project_action_triggered(self):
@@ -836,12 +837,16 @@ class MainController(QMainWindow):
                 sf.refresh_protocol()
 
         self.project_manager.reload_field_types()
+
         self.compare_frame_controller.refresh_field_types_for_labels()
         self.compare_frame_controller.set_shown_protocols()
         self.generator_tab_controller.set_network_sdr_send_button_visibility()
         self.generator_tab_controller.init_rfcat_plugin()
         self.generator_tab_controller.set_modulation_profile_status()
         self.simulator_tab_controller.refresh_field_types_for_labels()
+
+        if "num_sending_repeats" in changed_options:
+            self.project_manager.device_conf["num_sending_repeats"] = changed_options["num_sending_repeats"]
 
         if "default_view" in changed_options:
             self.apply_default_view(int(changed_options["default_view"]))
